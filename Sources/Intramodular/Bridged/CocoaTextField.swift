@@ -26,6 +26,7 @@ public struct CocoaTextField<Label: View>: CocoaView {
     private var kerning: CGFloat?
     private var keyboardType: UIKeyboardType = .default
     private var placeholder: String?
+    private var isSecureTextEntry: Bool?
     
     @Environment(\.font) var font
     
@@ -52,7 +53,8 @@ public struct CocoaTextField<Label: View>: CocoaView {
                 inputView: inputView,
                 kerning: kerning,
                 keyboardType: keyboardType,
-                placeholder: placeholder
+                placeholder: placeholder,
+                isSecureTextEntry: isSecureTextEntry
             )
         }
     }
@@ -80,6 +82,7 @@ public struct _CocoaTextField: UIViewRepresentable {
     var kerning: CGFloat?
     var keyboardType: UIKeyboardType
     var placeholder: String?
+    var isSecureTextEntry: Bool?
     
     public class Coordinator: NSObject, UITextFieldDelegate {
         var base: _CocoaTextField
@@ -188,6 +191,8 @@ public struct _CocoaTextField: UIViewRepresentable {
         
         uiView.text = text
         uiView.textAlignment = .init(multilineTextAlignment)
+
+        uiView.isSecureTextEntry = isSecureTextEntry
         
         DispatchQueue.main.async {
             if let isFirstResponder = self.isFirstResponder, uiView.window != nil {
@@ -294,6 +299,10 @@ extension CocoaTextField {
     
     public func placeholder(_ placeholder: String) -> Self {
         then({ $0.placeholder = placeholder })
+    }
+
+    public func isSecureTextEntry(_ isSecureTextEntry: Bool) -> Self {
+        then({ $0.isSecureTextEntry = isSecureTextEntry })
     }
 }
 
