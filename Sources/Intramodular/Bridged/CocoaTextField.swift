@@ -4,6 +4,7 @@
 
 import Swift
 import SwiftUI
+import Combine
 
 #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
 
@@ -27,6 +28,7 @@ public struct CocoaTextField<Label: View>: CocoaView {
     private var keyboardType: UIKeyboardType = .default
     private var placeholder: String?
     private var isSecureTextEntry = false
+    private var textContentType: UITextContentType?
     
     @Environment(\.font) var font
     
@@ -54,7 +56,8 @@ public struct CocoaTextField<Label: View>: CocoaView {
                 kerning: kerning,
                 keyboardType: keyboardType,
                 placeholder: placeholder,
-                isSecureTextEntry: isSecureTextEntry
+                isSecureTextEntry: isSecureTextEntry,
+                textContentType: textContentType
             )
         }
     }
@@ -83,6 +86,7 @@ public struct _CocoaTextField: UIViewRepresentable {
     var keyboardType: UIKeyboardType
     var placeholder: String?
     var isSecureTextEntry: Bool
+    var textContentType: UITextContentType?
     
     public class Coordinator: NSObject, UITextFieldDelegate {
         var base: _CocoaTextField
@@ -96,7 +100,10 @@ public struct _CocoaTextField: UIViewRepresentable {
         }
         
         public func textFieldDidChangeSelection(_ textField: UITextField) {
-            base.text = textField.text ?? ""
+            let text = textField.text ?? ""
+            if base.text != text {
+                base.text = text
+            }
         }
         
         public func textFieldDidEndEditing(_ textField: UITextField, reason: UITextField.DidEndEditingReason) {
@@ -117,18 +124,34 @@ public struct _CocoaTextField: UIViewRepresentable {
             
             return true
         }
+
+        @objc
+        public func textFieldDidChange(_ textField: UITextField) {
+            guard textField.markedTextRange == nil else {
+                return
+            }
+            let text = textField.text ?? ""
+            if base.text != text {
+                base.text = text
+            }
+        }
     }
     
     public func makeUIView(context: Context) -> UIViewType {
         let uiView = _UITextField()
         
         uiView.delegate = context.coordinator
+        uiView.setContentHuggingPriority(.defaultHigh, for: .vertical)
         
         if let isFirstResponder = isInitialFirstResponder, isFirstResponder {
             DispatchQueue.main.async {
                 uiView.becomeFirstResponder()
             }
         }
+
+//        uiView.addTarget(context.coordinator,
+//                         action: #selector(Coordinator.textFieldDidChange(_:)),
+//                         for: .editingChanged)
         
         return uiView
     }
@@ -137,15 +160,27 @@ public struct _CocoaTextField: UIViewRepresentable {
         uiView.onDeleteBackward = onDeleteBackward
         
         uiView.setContentHuggingPriority(.defaultHigh, for: .vertical)
-        
-        if let autocapitalization = autocapitalization {
+
+        if let autocapitalization = autocapitalization,
+            uiView.autocapitalizationType != autocapitalization {
             uiView.autocapitalizationType = autocapitalization
         }
+
+        if uiView.borderStyle != borderStyle {
+            uiView.borderStyle = borderStyle
+        }
+
+        if let font = uiFont, uiView.font != font {
+            uiView.font = font
+        }
+
+        if let font = font?.toUIFont(), uiView.font != font {
+            uiView.font = font
+        } else if font?.toUIFont() == nil {
+            uiView.font = nil
+        }
         
-        uiView.borderStyle = borderStyle
-        uiView.font = uiFont ?? font?.toUIFont()
-        
-        if let kerning = kerning {
+        if let kerning = kerning, (uiView.defaultTextAttributes[.kern] as? CGFloat) != kerning {
             uiView.defaultTextAttributes.updateValue(kerning, forKey: .kern)
         }
         
@@ -156,7 +191,7 @@ public struct _CocoaTextField: UIViewRepresentable {
                 uiView.inputAccessoryView = UIHostingView(rootView: inputAccessoryView)
                 uiView.inputAccessoryView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
             }
-        } else {
+        } else if uiView.inputAccessoryView != nil {
             uiView.inputAccessoryView = nil
         }
         
@@ -167,12 +202,19 @@ public struct _CocoaTextField: UIViewRepresentable {
                 uiView.inputView = UIHostingView(rootView: inputView)
                 uiView.inputView?.autoresizingMask = [.flexibleWidth, .flexibleHeight]
             }
-        } else {
+        } else if uiView.inputView != nil{
             uiView.inputView = nil
         }
-        
-        uiView.isUserInteractionEnabled = isEnabled
-        uiView.keyboardType = keyboardType
+
+        if uiView.isUserInteractionEnabled != isEnabled {
+            uiView.isUserInteractionEnabled = isEnabled
+        }
+
+        if uiView.keyboardType != keyboardType {
+            uiView.keyboardType = keyboardType
+        }
+
+        let textAlignment = NSTextAlignment(multilineTextAlignment)
         
         if let placeholder = placeholder {
             uiView.attributedPlaceholder = NSAttributedString(
@@ -180,19 +222,30 @@ public struct _CocoaTextField: UIViewRepresentable {
                 attributes: [
                     .font: font as Any,
                     .paragraphStyle: NSMutableParagraphStyle().then {
-                        $0.alignment = .init(multilineTextAlignment)
+                        $0.alignment = textAlignment
                     }
                 ]
             )
-        } else {
+        } else if uiView.attributedPlaceholder != nil {
             uiView.attributedPlaceholder = nil
             uiView.placeholder = nil
         }
-        
-        uiView.text = text
-        uiView.textAlignment = .init(multilineTextAlignment)
 
-        uiView.isSecureTextEntry = isSecureTextEntry
+        if uiView.text != text {
+            uiView.text = text
+        }
+
+        if uiView.textAlignment != textAlignment {
+            uiView.textAlignment = textAlignment
+        }
+
+        if uiView.isSecureTextEntry != isSecureTextEntry {
+            uiView.isSecureTextEntry = isSecureTextEntry
+        }
+
+        if uiView.textContentType != textContentType {
+            uiView.textContentType = textContentType
+        }
         
         DispatchQueue.main.async {
             if let isFirstResponder = self.isFirstResponder, uiView.window != nil {
@@ -303,6 +356,10 @@ extension CocoaTextField {
 
     public func isSecureTextEntry(_ isSecureTextEntry: Bool) -> Self {
         then({ $0.isSecureTextEntry = isSecureTextEntry })
+    }
+
+    public func textContentType(_ textContentType: UITextContentType?) -> Self {
+        then({ $0.textContentType = textContentType })
     }
 }
 
