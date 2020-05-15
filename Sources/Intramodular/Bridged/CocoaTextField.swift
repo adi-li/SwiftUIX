@@ -30,7 +30,7 @@ public struct CocoaTextField<Label: View>: CocoaView {
     private var isSecureTextEntry = false
     private var textContentType: UITextContentType?
     private var textColor: UIColor?
-    
+
     @Environment(\.font) var font
 
     public var body: some View {
@@ -90,7 +90,7 @@ public struct _CocoaTextField: UIViewRepresentable {
     var isSecureTextEntry: Bool
     var textContentType: UITextContentType?
     var textColor: UIColor?
-    
+
     public class Coordinator: NSObject, UITextFieldDelegate {
         var base: _CocoaTextField
         
@@ -161,8 +161,6 @@ public struct _CocoaTextField: UIViewRepresentable {
     
     public func updateUIView(_ uiView: UIViewType, context: Context) {
         uiView.onDeleteBackward = onDeleteBackward
-        
-        uiView.setContentHuggingPriority(.defaultHigh, for: .vertical)
 
         if let autocapitalization = autocapitalization,
             uiView.autocapitalizationType != autocapitalization {
@@ -253,7 +251,7 @@ public struct _CocoaTextField: UIViewRepresentable {
         if uiView.textColor != textColor {
             uiView.textColor = textColor
         }
-        
+
         DispatchQueue.main.async {
             if let isFirstResponder = self.isFirstResponder, uiView.window != nil {
                 if isFirstResponder && !uiView.isFirstResponder {
