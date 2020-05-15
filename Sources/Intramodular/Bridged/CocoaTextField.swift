@@ -29,9 +29,10 @@ public struct CocoaTextField<Label: View>: CocoaView {
     private var placeholder: String?
     private var isSecureTextEntry = false
     private var textContentType: UITextContentType?
+    private var textColor: UIColor?
     
     @Environment(\.font) var font
-    
+
     public var body: some View {
         return ZStack(alignment: .topLeading) {
             if placeholder == nil {
@@ -57,7 +58,8 @@ public struct CocoaTextField<Label: View>: CocoaView {
                 keyboardType: keyboardType,
                 placeholder: placeholder,
                 isSecureTextEntry: isSecureTextEntry,
-                textContentType: textContentType
+                textContentType: textContentType,
+                textColor: textColor
             )
         }
     }
@@ -87,6 +89,7 @@ public struct _CocoaTextField: UIViewRepresentable {
     var placeholder: String?
     var isSecureTextEntry: Bool
     var textContentType: UITextContentType?
+    var textColor: UIColor?
     
     public class Coordinator: NSObject, UITextFieldDelegate {
         var base: _CocoaTextField
@@ -246,6 +249,10 @@ public struct _CocoaTextField: UIViewRepresentable {
         if uiView.textContentType != textContentType {
             uiView.textContentType = textContentType
         }
+
+        if uiView.textColor != textColor {
+            uiView.textColor = textColor
+        }
         
         DispatchQueue.main.async {
             if let isFirstResponder = self.isFirstResponder, uiView.window != nil {
@@ -360,6 +367,10 @@ extension CocoaTextField {
 
     public func textContentType(_ textContentType: UITextContentType?) -> Self {
         then({ $0.textContentType = textContentType })
+    }
+
+    public func textColor(_ textColor: UIColor?) -> Self {
+        then({ $0.textColor = textColor })
     }
 }
 
