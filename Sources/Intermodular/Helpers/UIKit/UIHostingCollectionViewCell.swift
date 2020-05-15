@@ -7,62 +7,6 @@ import SwiftUI
 
 #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
 
-public struct UICollectionViewCellRootView<Item: Identifiable, Content: View>: View {
-    struct _ListRowManager: ListRowManager {
-        weak var base: UIHostingCollectionViewCell<Item, Content>?
-        
-        var isHighlighted: Bool = false
-        
-        func _animate(_ action: () -> ()) {
-            base?.collectionViewController.collectionViewLayout.invalidateLayout()
-        }
-        
-        func _reload() {
-            base?.reload()
-        }
-    }
-    
-    var manager: _ListRowManager
-    
-    init(base: UIHostingCollectionViewCell<Item, Content>?) {
-        self.manager = .init(base: base)
-    }
-    
-    public var body: some View {
-        manager.base.ifSome { base in
-            base
-                .makeContent(base.item)
-                .environment(\.listRowManager, manager)
-                .onPreferenceChange(_ListRowPreferencesKey.self, perform: { base.listRowPreferences = $0 })
-                .id(base.item.id)
-        }
-    }
-}
-
-open class UICollectionViewCellContentHostingController<Item: Identifiable, Content: View>: UIHostingController<UICollectionViewCellRootView<Item, Content>> {
-    unowned let base: UIHostingCollectionViewCell<Item, Content>
-    
-    init(base: UIHostingCollectionViewCell<Item, Content>) {
-        self.base = base
-        
-        super.init(rootView: .init(base: base))
-    }
-    
-    override open func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        
-        if let indexPath = base.indexPath {
-            if let cell = base.collectionViewController.collectionView.cellForItem(at: indexPath), cell.frame.size != sizeThatFits(in: .greatestFiniteSize) {
-                base.collectionViewController.collectionView.reloadItems(at: [indexPath])
-            }
-        }
-    }
-    
-    @objc required public init?(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
-
 public class UIHostingCollectionViewCell<Item: Identifiable, Content: View> : UICollectionViewCell {
     var collectionViewController: (UICollectionViewController & UICollectionViewDelegateFlowLayout)!
     var indexPath: IndexPath?
@@ -71,7 +15,6 @@ public class UIHostingCollectionViewCell<Item: Identifiable, Content: View> : UI
     var makeContent: ((Item) -> Content)!
     
     private var contentHostingController: UICollectionViewCellContentHostingController<Item, Content>!
-    private var isContentSizeCached = false
     
     var listRowPreferences: _ListRowPreferences?
     
@@ -79,6 +22,13 @@ public class UIHostingCollectionViewCell<Item: Identifiable, Content: View> : UI
         didSet {
             contentHostingController.rootView.manager.isHighlighted = isHighlighted
         }
+    }
+    
+    private var maximumSize: OptionalDimensions {
+        OptionalDimensions(
+            width: collectionViewController.collectionView.contentSize.width - 0.001,
+            height: collectionViewController.collectionView.contentSize.height - 0.001
+        )
     }
     
     override public func awakeFromNib() {
@@ -95,27 +45,37 @@ public class UIHostingCollectionViewCell<Item: Identifiable, Content: View> : UI
     }
     
     override public func preferredLayoutAttributesFitting(_ layoutAttributes: UICollectionViewLayoutAttributes) -> UICollectionViewLayoutAttributes {
-        if !isContentSizeCached {
-            contentHostingController?.view.setNeedsLayout()
-            contentHostingController?.view.layoutIfNeeded()
-            
-            layoutAttributes.frame.size = contentHostingController.sizeThatFits(in: layoutAttributes.size)
-            
-            if layoutAttributes.frame.size == .zero {
-                layoutAttributes.frame.size = .init(width: 1, height: 1)
-            } else {
-                isContentSizeCached = true
-            }
-        }
+        layoutAttributes.size = systemLayoutSizeFitting(layoutAttributes.size)
         
         return layoutAttributes
     }
     
-    override public func prepareForReuse() {
-        isContentSizeCached = false
-        listRowPreferences = nil
+    override public func systemLayoutSizeFitting(_ targetSize: CGSize) -> CGSize  {
+        guard let contentHostingController = contentHostingController else  {
+            return CGSize(width: 1, height: 1)
+        }
         
+        return contentHostingController.sizeThatFits(
+            in: .init(targetSize),
+            targetSize: nil,
+            maximumSize: maximumSize
+        )
+    }
+    
+    override public func systemLayoutSizeFitting(
+        _ targetSize: CGSize,
+        withHorizontalFittingPriority horizontalFittingPriority: UILayoutPriority,
+        verticalFittingPriority: UILayoutPriority
+    ) -> CGSize {
+        systemLayoutSizeFitting(targetSize)
+    }
+    
+    override public func prepareForReuse() {
         super.prepareForReuse()
+        
+        indexPath = nil
+        isSelected = false
+        listRowPreferences = nil
     }
     
     public func reload() {
@@ -162,6 +122,24 @@ extension UIHostingCollectionViewCell {
 
 extension String {
     static let hostingCollectionViewCellIdentifier = "UIHostingCollectionViewCell"
+}
+
+open class UICollectionViewCellContentHostingController<Item: Identifiable, Content: View>: UIHostingController<UIHostingCollectionViewCellRootView<Item, Content>> {
+    unowned let base: UIHostingCollectionViewCell<Item, Content>
+    
+    init(base: UIHostingCollectionViewCell<Item, Content>) {
+        self.base = base
+        
+        super.init(rootView: .init(base: base))
+    }
+    
+    override open func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+    }
+    
+    @objc required public init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 }
 
 #endif
